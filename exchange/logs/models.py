@@ -6,3 +6,6 @@ class logs(models.Model):
     action = models.CharField(max_length=30)
     logDetails = models.TextField(max_length=150)
     created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.action} by {self.owner} at {self.created}"
