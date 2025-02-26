@@ -6,7 +6,8 @@ class CustomUser(AbstractUser):
     class Type(models.TextChoices):
         regular_user = 'RU','Regular-user'
         owner = 'OW','Owner'
-
+    first_name = models.CharField(max_length=150, blank=False, null=False)
+    last_name = models.CharField(max_length=150, blank=False, null=False)
     address = models.CharField(max_length=50,unique=True)
     balance = models.FloatField(default=0)
     # picture = models.ImageField(upload_to='users/pictures', blank=True)
