@@ -23,12 +23,12 @@ class Signup(generics.ListCreateAPIView):
         return response
     def perform_create(self, serializer):
         user = serializer.save()
-        last = logs.objects.create(
+        logs.objects.create(
             owner=user,
             action="Signup",
             logDetails="New user registered",
         )
-        print(last)
+
 class Login(generics.GenericAPIView):
     serializer_class = LoginSerializer
     def post(self, request, *args, **kwargs):
@@ -37,7 +37,7 @@ class Login(generics.GenericAPIView):
         user = authenticate(username=username, password=password)
         if user:
             user = CustomUser.objects.get(username=username)
-            last = logs.objects.create(
+            logs.objects.create(
                 owner=user,
                 action="Login",
                 logDetails=f"{user.username} Logged in",
@@ -61,3 +61,10 @@ class Logout(APIView):
             return Response({"message": "Successfully logged out."}, status=200)
         except Exception as e:
             return Response({"error": "Invalid token"}, status=400)
+
+
+class checklogin(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        return Response({"message": "User is authenticated", "user":request.user.username}, status=200)
