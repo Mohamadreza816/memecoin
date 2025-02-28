@@ -40,6 +40,7 @@ class UserSerializer(serializers.ModelSerializer):
         iran_tz = pytz.timezone("Asia/Tehran")
         local_time = localtime(obj.date_joined, iran_tz)
         return local_time.strftime("%Y-%m-%d ---- %H:%M:%S")
+
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField()

@@ -5,7 +5,7 @@ from functions.addressgenrator import generate_contract_address
 # Create your models here.
 class Mycoin(models.Model):
     owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
-    available = models.BooleanField(default=True)
+    available = models.FloatField(default=True)
     contractAddress = models.CharField(max_length=50,unique=True)
     name = models.CharField(max_length=50,default='Oscar')
     price = models.DecimalField(max_digits=10,decimal_places=2)
