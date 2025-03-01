@@ -24,3 +24,15 @@ print(get_response.json())
 # get_response = requests.post(endpoint, json={"title": "yoho"}, headers=headers)
 #
 # print(get_response.json())
+
+
+{
+	"username":"samin",
+  	"password" : "45"
+}
+
+{
+  "type":"B",
+  "amount":100
+
+}
