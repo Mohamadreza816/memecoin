@@ -4,6 +4,8 @@ from rest_framework import serializers
 from users.models import CustomUser
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
+from django.contrib.auth import get_user_model
+CustomUser = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -44,3 +46,34 @@ class UserSerializer(serializers.ModelSerializer):
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
     password = serializers.CharField()
+
+class UserUpdateserializers(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['first_name','last_name', 'username', 'email']
+
+class changePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True)
+    confirm_password = serializers.CharField(write_only=True)
+
+    def validate_old_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+          raise serializers.ValidationError({'error' : 'Invalid old password'})
+        return value
+
+    def validate(self, data):
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError({'error' : 'Passwords must match'})
+        try:
+            validate_password(data['new_password'])
+        except ValidationError as e:
+            raise serializers.ValidationError(e.messages)
+        return data
+
+    def update_password(self):
+        user = self.context['request'].user
+        user.set_password(self.validated_data['new_password'])
+        user.save()
+        return user

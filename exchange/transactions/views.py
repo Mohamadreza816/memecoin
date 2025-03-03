@@ -1,7 +1,9 @@
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.response import Response
 from rest_framework import generics , permissions,status
-from transactions.serializers import TransactionSerializer
+from rest_framework.views import APIView
+from django.db.models import Q
+from transactions.serializers import TransactionSerializer,TransactionFilterSerializer
 from transactions.models import Transaction
 from logs.models import logs
 from users.models import CustomUser
@@ -21,7 +23,6 @@ class TransactionView(generics.CreateAPIView):
         if transaction_type is None:
             raise ValidationError({"error": "فیلد type الزامی است."})
         to_address = serializer.validated_data.get('to_add')
-        print(f"DEBUG: Raw to_add from request: {to_address} (type: {type(to_address)})")
         amount = serializer.validated_data['amount']
         status_code = Transaction.Status.Uncompleted
         # get meme coin
@@ -223,3 +224,101 @@ class TransactionView(generics.CreateAPIView):
             "transaction_status": transactions_instance.get_status(),
         }
         return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
+
+#Test Below classes....
+class getAddbalance(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    def get(self, request):
+        try:
+            print(f"data is here:{self.request.data}")
+            balance = request.user.balance
+            memecoin_balance = request.user.memecoin_balance
+            return Response({"balance": balance, "memecoin_balance": memecoin_balance}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"Error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def post(self, request):
+        balance = self.request.data.get("balance")
+        user = self.request.user
+        if balance is None or balance <= 0:
+            transaction_obj = Transaction.objects.create(
+                owner=user,
+                type=Transaction.Type.Deposit,
+                amount=0,
+                status=Transaction.Status.Failed,
+            )
+            transaction_obj.save()
+            return Response({"Error": "balance cannot be empty"}, status=status.HTTP_400_BAD_REQUEST)
+        user.balance += balance
+        user.save()
+        request.user.refresh_from_db()
+        transaction_obj = Transaction.objects.create(
+            owner=user,
+            type=Transaction.Type.Deposit,
+            amount=balance,
+            status=Transaction.Status.Complete,
+        )
+        transaction_obj.save()
+        return Response({"new_balance": user.balance}, status=status.HTTP_200_OK)
+
+class TransactionList(generics.ListAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = TransactionSerializer
+    def get_queryset(self):
+        user = self.request.user
+        return Transaction.objects.filter(owner=user).order_by("-time")
+
+class Transactionfilter(generics.ListAPIView):
+    # permission_classes = [permissions.IsAuthenticated]
+    serializer_class = TransactionFilterSerializer
+    # filter_serializer_class = TransactionFilterSerializer
+    queryset = Transaction.objects.filter(owner=CustomUser.objects.get(id=7))
+    def post(self, request):
+        return self.list(request)
+    def list(self, request):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = TransactionSerializer(queryset, many=True)
+        return Response(serializer.data)
+    def get_queryset(self):
+        filter_serializer = TransactionFilterSerializer(data=self.request.data)
+        filter_serializer.is_valid(raise_exception=True)
+        filters = filter_serializer.validated_data
+
+        start_date = filters.get('start_date', None)
+        end_date = filters.get('end_date', None)
+        if start_date and end_date:
+            queryset = queryset.filter(time__range=[start_date, end_date])
+        elif start_date:
+            queryset = queryset.filter(time__gte=start_date)
+        elif end_date:
+            queryset = queryset.filter(time__lte=end_date)
+
+        min_amount = filters.get('min_amount', None)
+        max_amount = filters.get('max_amount', None)
+        if min_amount and max_amount:
+            queryset = queryset.filter(time__gte=min_amount, time__lte=max_amount)
+        if min_amount:
+            queryset = queryset.filter(amount__gte=min_amount)
+        if max_amount:
+            queryset = queryset.filter(amount__lte=max_amount)
+
+        sender_name = filters.get('sender_name', None)
+        if sender_name:
+            queryset = queryset.filter(
+                Q(owner__username__icontains=sender_name) |
+                Q(owner__first_name__icontains=sender_name) |
+                Q(owner__last_name__icontains=sender_name)
+            )
+
+        receiver_name = filters.get('receiver_name', None)
+        if receiver_name:
+            queryset = queryset.filter(
+                Q(to_add__user__first_name__icontains=receiver_name) |
+                Q(to_add__user__last_name__icontains=receiver_name)
+            )
+        return queryset

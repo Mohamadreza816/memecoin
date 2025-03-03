@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Transaction
 from users.models import CustomUser
+from django.utils import timezone
 class TransactionSerializer(serializers.ModelSerializer):
     type = serializers.CharField(max_length=1)
     status = serializers.SerializerMethodField()
@@ -28,3 +29,11 @@ class TransactionSerializer(serializers.ModelSerializer):
 
     def get_status(self, obj):
         return obj.status
+
+class TransactionFilterSerializer(serializers.Serializer):
+    start_date = serializers.DateField(required=False)
+    end_date = serializers.DateField(required=False)
+    min_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    max_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
+    sender_name = serializers.CharField(required=False)
+    receiver_name = serializers.CharField(required=False)
