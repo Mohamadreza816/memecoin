@@ -1,9 +1,12 @@
 from django.template.defaultfilters import first
+from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiTypes
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.response import Response
 from rest_framework import generics , permissions,status
 from rest_framework.views import APIView
-from django.db.models import Q
+from django.db.models import Q, DecimalField
+from unicodedata import decimal
 from yaml import serialize
 
 from transactions.serializers import TransactionSerializer,TransactionFilterSerializer
@@ -231,6 +234,29 @@ class TransactionView(generics.CreateAPIView):
 #
 class getAddbalance(APIView):
     permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        summary="Get user balance",
+        description="Returns the balance and memecoin balance of the authenticated user.",
+        responses={
+            200: OpenApiResponse(
+                description="Successful response",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "balance": {
+                            "type": "number",
+                            "format": "decimal",
+                        },
+                        "memecoin_balance": {
+                            "type": "number",
+                            "format": "decimal",
+                        },
+                    },
+                },
+            ),
+        },
+    )
     def get(self, request):
         try:
             print(f"data is here:{self.request.data}")
@@ -239,6 +265,38 @@ class getAddbalance(APIView):
             return Response({"balance": balance, "memecoin_balance": memecoin_balance}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"Error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @extend_schema(
+        summary="Deposit money",
+        description="Allows users to deposit money into their balance. Balance must be greater than 0.",
+        request={
+            "type": "object",
+            "properties": {
+                "balance": {"type": "integer", "description": "The amount to deposit."},
+            },
+            "required": ["balance"],
+        },
+        responses={
+            200: OpenApiResponse(
+                description="Deposit successful",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "new_balance": {"type": "integer", "description": "The updated balance after deposit."},
+                    },
+                },
+            ),
+            400: OpenApiResponse(
+                description="Bad request",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "Error": {"type": "string", "example": "balance cannot be empty"},
+                    },
+                },
+            ),
+        },
+    )
 
     def post(self, request):
         balance = self.request.data.get("balance")
@@ -273,6 +331,13 @@ class TransactionList(generics.ListAPIView):
 
 class Transactionfilter(APIView):
     permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        request=TransactionFilterSerializer,
+        responses=TransactionSerializer(many=True),
+        description="Filter transactions based on date range, amount, sender, and receiver",
+        summary="Filter Transactions"
+    )
     def post(self, request):
         filter_serialize = TransactionFilterSerializer(data=request.data)
         filter_serialize.is_valid(raise_exception=True)
