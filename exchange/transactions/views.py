@@ -1,8 +1,11 @@
+from django.template.defaultfilters import first
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.response import Response
 from rest_framework import generics , permissions,status
 from rest_framework.views import APIView
 from django.db.models import Q
+from yaml import serialize
+
 from transactions.serializers import TransactionSerializer,TransactionFilterSerializer
 from transactions.models import Transaction
 from logs.models import logs
@@ -225,7 +228,7 @@ class TransactionView(generics.CreateAPIView):
         }
         return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
 
-#Test Below classes....
+#
 class getAddbalance(APIView):
     permission_classes = [permissions.IsAuthenticated]
     def get(self, request):
@@ -268,26 +271,16 @@ class TransactionList(generics.ListAPIView):
         user = self.request.user
         return Transaction.objects.filter(owner=user).order_by("-time")
 
-class Transactionfilter(generics.ListAPIView):
-    # permission_classes = [permissions.IsAuthenticated]
-    serializer_class = TransactionFilterSerializer
-    # filter_serializer_class = TransactionFilterSerializer
-    queryset = Transaction.objects.filter(owner=CustomUser.objects.get(id=7))
+class Transactionfilter(APIView):
+    permission_classes = [permissions.IsAuthenticated]
     def post(self, request):
-        return self.list(request)
-    def list(self, request):
-        queryset = self.filter_queryset(self.get_queryset())
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+        filter_serialize = TransactionFilterSerializer(data=request.data)
+        filter_serialize.is_valid(raise_exception=True)
+        queryset = Transaction.objects.filter(owner=request.user)
+        filters = filter_serialize.validated_data
 
-        serializer = TransactionSerializer(queryset, many=True)
-        return Response(serializer.data)
-    def get_queryset(self):
-        filter_serializer = TransactionFilterSerializer(data=self.request.data)
-        filter_serializer.is_valid(raise_exception=True)
-        filters = filter_serializer.validated_data
+        if not any(filters.values()):
+            raise ValidationError({"Error": "At least one filter must be specified."})
 
         start_date = filters.get('start_date', None)
         end_date = filters.get('end_date', None)
@@ -301,7 +294,7 @@ class Transactionfilter(generics.ListAPIView):
         min_amount = filters.get('min_amount', None)
         max_amount = filters.get('max_amount', None)
         if min_amount and max_amount:
-            queryset = queryset.filter(time__gte=min_amount, time__lte=max_amount)
+            queryset = queryset.filter(amount__gte=min_amount, amount__lte=max_amount)
         if min_amount:
             queryset = queryset.filter(amount__gte=min_amount)
         if max_amount:
@@ -310,15 +303,27 @@ class Transactionfilter(generics.ListAPIView):
         sender_name = filters.get('sender_name', None)
         if sender_name:
             queryset = queryset.filter(
-                Q(owner__username__icontains=sender_name) |
-                Q(owner__first_name__icontains=sender_name) |
-                Q(owner__last_name__icontains=sender_name)
+                Q(owner__username__icontains=sender_name)
             )
+            if queryset is None:
+                raise ValidationError({"Error": "sender with this username does not exist"})
 
         receiver_name = filters.get('receiver_name', None)
+        address = ""
         if receiver_name:
+            try:
+                receiver_address = CustomUser.objects.get(
+                    Q(username__icontains=receiver_name)
+                )
+                address = receiver_address.address
+            except CustomUser.DoesNotExist:
+                raise ValidationError({"Error": "receiver with this username does not exist"})
+
             queryset = queryset.filter(
-                Q(to_add__user__first_name__icontains=receiver_name) |
-                Q(to_add__user__last_name__icontains=receiver_name)
+                to_add=address
             )
-        return queryset
+            if not queryset.exists():
+                return Response({"Error": "No transactions found."}, status=status.HTTP_404_NOT_FOUND)
+
+        result = TransactionSerializer(queryset, many=True)
+        return Response(result.data, status=status.HTTP_200_OK)
