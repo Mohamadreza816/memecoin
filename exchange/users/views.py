@@ -1,5 +1,7 @@
 from django.shortcuts import render
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema
+
 from rest_framework.views import APIView
 from rest_framework import generics , permissions,status
 from .serializers import UserSerializer,LoginSerializer,UserUpdateserializers,changePasswordSerializer
@@ -95,16 +97,36 @@ class ProfileUpdateView(generics.RetrieveUpdateAPIView):
         )
         return Response(serializer.data)
 
-class ChangePasswordView(generics.UpdateAPIView):
-    serializer_class = changePasswordSerializer
+class ChangePasswordView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    def update(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data,context={'request': request})
+
+    @extend_schema(
+        request=changePasswordSerializer,
+        responses={
+            200: {
+                "description": "Password changed successfully",
+                "example": {
+                    "message": "Your password has been changed successfully.",
+                    "status": "success"
+                }
+            },
+            400: {
+                "description": "Invalid password format",
+                "example": {
+                    "message": "Old password is incorrect",
+                    "status": "error"
+                }
+            }
+        },        description="Filter transactions based on date range, amount, sender, and receiver",
+        summary="Filter Transactions"
+    )
+    def put(self, request, *args, **kwargs):
+        serializer = changePasswordSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.update_password()
         log = logs.objects.create(
-            owner = self.request.user,
+            owner=self.request.user,
             action="Change Password",
-            logDetails=f"{self.get_object().username} changed Password",
+            logDetails=f"{self.request.user.username} changed Password",
         )
         return Response({"message": "Password updated successfully"}, status=200)
