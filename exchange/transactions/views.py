@@ -9,7 +9,7 @@ from django.db.models import Q, DecimalField
 from unicodedata import decimal
 from yaml import serialize
 
-from transactions.serializers import TransactionSerializer,TransactionFilterSerializer
+from transactions.serializers import TransactionSerializer,TransactionFilterSerializer,walletaddressSerializer,getnamepriceSerializer
 from transactions.models import Transaction
 from logs.models import logs
 from users.models import CustomUser
@@ -226,8 +226,8 @@ class TransactionView(generics.CreateAPIView):
         transactions_instance = serializer.instance
         response_data = {
             "new_memecoin_balance": request.user.memecoin_balance,
-            "transaction_type": transactions_instance.get_type_display(),
-            "transaction_status": transactions_instance.get_status(),
+            "transaction_type": transactions_instance.type,
+            "transaction_status": transactions_instance.status,
         }
         return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
 
@@ -392,3 +392,29 @@ class Transactionfilter(APIView):
 
         result = TransactionSerializer(queryset, many=True)
         return Response(result.data, status=status.HTTP_200_OK)
+
+class WalletAddressView(generics.RetrieveAPIView):
+    serializer_class = walletaddressSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    @extend_schema(
+        methods=["GET"],
+        responses=walletaddressSerializer,
+        description="Filter transactions based on date range, amount, sender, and receiver",
+        summary="Filter Transactions"
+    )
+    def get_object(self):
+        return self.request.user
+
+# get name and price of meme coin
+class getcoin(generics.RetrieveAPIView):
+    serializer_class = getnamepriceSerializer
+    # permission_classes = [permissions.IsAuthenticated]
+    @extend_schema(
+        methods=["GET"],
+        responses=getnamepriceSerializer,
+        description="Filter coin based name and price ",
+        summary="Filter Mycoin"
+    )
+    def get_object(self):
+        return Mycoin.objects.get(id=1)

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Transaction
 from users.models import CustomUser
+from market.models import Mycoin
 from django.utils import timezone
 class TransactionSerializer(serializers.ModelSerializer):
     type = serializers.CharField(max_length=1)
@@ -37,3 +38,17 @@ class TransactionFilterSerializer(serializers.Serializer):
     max_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     sender_name = serializers.CharField(required=False)
     receiver_name = serializers.CharField(required=False)
+
+
+
+class walletaddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['username','address']
+        read_only_fields = ['address','username']
+
+
+class getnamepriceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Mycoin
+        fields = ['name','price']

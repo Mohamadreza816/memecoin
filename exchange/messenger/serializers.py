@@ -10,4 +10,5 @@ class MessageSerializer(serializers.ModelSerializer):
             'username': {'read_only': True},
             'm_status': {'read_only': True},
             'created_at': {'read_only': True},
+            'file' : {'required': False},
         }
