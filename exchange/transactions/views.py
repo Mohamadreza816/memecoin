@@ -1,6 +1,7 @@
 from django.template.defaultfilters import first
 from drf_spectacular.utils import extend_schema
 from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiTypes
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError, PermissionDenied
 from rest_framework.response import Response
 from rest_framework import generics , permissions,status
@@ -8,7 +9,6 @@ from rest_framework.views import APIView
 from django.db.models import Q, DecimalField
 from unicodedata import decimal
 from yaml import serialize
-
 from transactions.serializers import TransactionSerializer,TransactionFilterSerializer,walletaddressSerializer,getnamepriceSerializer
 from transactions.models import Transaction
 from logs.models import logs
@@ -216,7 +216,6 @@ class TransactionView(generics.CreateAPIView):
         sender.save()
 
         serializer.instance = transaction_obj_sender
-
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -272,7 +271,7 @@ class getAddbalance(APIView):
         request={
             "type": "object",
             "properties": {
-                "balance": {"type": "integer", "description": "The amount to deposit."},
+                "balance": {"type": "number","format": "decimal", "description": "The amount to deposit."},
             },
             "required": ["balance"],
         },
@@ -309,6 +308,12 @@ class getAddbalance(APIView):
                 status=Transaction.Status.Failed,
             )
             transaction_obj.save()
+            log = logs.objects.create(
+                owner=user,
+                action = "Deposit",
+                logDetails="Deposit unsuccessful",
+            )
+            log.save()
             return Response({"Error": "balance cannot be empty"}, status=status.HTTP_400_BAD_REQUEST)
         user.balance += balance
         user.save()
@@ -320,6 +325,12 @@ class getAddbalance(APIView):
             status=Transaction.Status.Complete,
         )
         transaction_obj.save()
+        log = logs.objects.create(
+            owner=user,
+            action="Deposit",
+            logDetails="Deposit successful",
+        )
+        log.save()
         return Response({"new_balance": user.balance}, status=status.HTTP_200_OK)
 
 class TransactionList(generics.ListAPIView):

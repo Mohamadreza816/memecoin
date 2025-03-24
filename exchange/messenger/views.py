@@ -1,7 +1,7 @@
 from rest_framework import status,generics,permissions
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
-
+from logs.models import logs
 from .models import Message
 from users.models import CustomUser
 from .serializers import MessageSerializer
@@ -17,6 +17,11 @@ class SendMessageView(generics.CreateAPIView):
         if not CustomUser.objects.filter(address=to_address).exists():
             raise ValidationError({"error": "Receiver wallet address is invalid."})
 
+        log = logs.objects.create(
+            owner=self.request.user,
+            action="send message",
+            logDetails=f"{self.request.user} send message",
+        )
         serializer.save(owner=self.request.user,username=self.request.user.username,m_status='US')
 
 class UserMessagesView(generics.ListAPIView):
